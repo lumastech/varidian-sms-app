@@ -65,6 +65,9 @@ object Routes {
     const val WEBHOOKS = "webhooks"
     const val PHONE_KEYS = "phone_keys"
     const val GATEWAY = "gateway"
+
+    /** Gateway settings shown instead of login when no account is signed in. */
+    const val GATEWAY_STANDALONE = "gateway_standalone"
 }
 
 @Composable
@@ -73,7 +76,7 @@ fun AppRoot() {
     val prefs = remember { AppPrefs(context) }
     val nav = rememberNavController()
 
-    val start = if (prefs.isAccountLoggedIn) Routes.MAIN else Routes.LOGIN
+    val start = if (prefs.isAccountLoggedIn) Routes.MAIN else Routes.GATEWAY_STANDALONE
 
     fun goToMain() {
         nav.navigate(Routes.MAIN) {
@@ -81,13 +84,18 @@ fun AppRoot() {
         }
     }
 
-    fun goToLogin() {
-        nav.navigate(Routes.LOGIN) {
+    fun goToStandaloneGateway() {
+        nav.navigate(Routes.GATEWAY_STANDALONE) {
             popUpTo(0) { inclusive = true }
         }
     }
 
     NavHost(navController = nav, startDestination = start) {
+        composable(Routes.GATEWAY_STANDALONE) {
+            GatewaySettingsScreen(
+                onGoToLogin = { nav.navigate(Routes.LOGIN) },
+            )
+        }
         composable(Routes.LOGIN) {
             LoginScreen(
                 onLoggedIn = ::goToMain,
@@ -106,7 +114,7 @@ fun AppRoot() {
                 onOpenWebhooks = { nav.navigate(Routes.WEBHOOKS) },
                 onOpenPhoneKeys = { nav.navigate(Routes.PHONE_KEYS) },
                 onOpenGateway = { nav.navigate(Routes.GATEWAY) },
-                onLoggedOut = ::goToLogin,
+                onLoggedOut = ::goToStandaloneGateway,
             )
         }
         composable(Routes.SEND) {

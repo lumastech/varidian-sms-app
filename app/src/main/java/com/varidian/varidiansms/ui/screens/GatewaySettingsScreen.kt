@@ -34,6 +34,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -74,12 +75,21 @@ private val REQUIRED_PERMISSIONS: Array<String> = buildList {
  *
  * The gateway authenticates with the account key by default; a
  * dedicated phone API key (vpk_…) can be pasted for tighter scoping.
+ *
+ * Also serves as the start screen when no account is signed in
+ * ([onGoToLogin] set, [onBack] null): the phone activates the gateway
+ * with just a vpk_ key generated on another signed-in phone or the
+ * portal, and signing in stays optional.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun GatewaySettingsScreen(onBack: () -> Unit) {
+fun GatewaySettingsScreen(
+    onBack: (() -> Unit)? = null,
+    onGoToLogin: (() -> Unit)? = null,
+) {
     val context = LocalContext.current
     val prefs = remember { AppPrefs(context) }
+    val accountLoggedIn = prefs.isAccountLoggedIn
 
     var phoneNumber by rememberSaveable { mutableStateOf(prefs.phoneNumber) }
     var dedicatedKey by rememberSaveable { mutableStateOf(prefs.gatewayApiKey) }
@@ -116,6 +126,10 @@ fun GatewaySettingsScreen(onBack: () -> Unit) {
         if (busy) return
         if (phoneNumber.isBlank()) {
             Toast.makeText(context, "Enter this phone's number", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (!accountLoggedIn && dedicatedKey.isBlank()) {
+            Toast.makeText(context, "Enter a phone API key, or sign in to use your account key", Toast.LENGTH_LONG).show()
             return
         }
         if (!hasAllPermissions()) {
@@ -158,8 +172,15 @@ fun GatewaySettingsScreen(onBack: () -> Unit) {
             TopAppBar(
                 title = { Text("SMS Gateway Settings") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    if (onBack != null) {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        }
+                    }
+                },
+                actions = {
+                    if (onGoToLogin != null) {
+                        TextButton(onClick = onGoToLogin) { Text("Sign in") }
                     }
                 },
             )
@@ -194,7 +215,11 @@ fun GatewaySettingsScreen(onBack: () -> Unit) {
             Spacer(Modifier.height(16.dp))
 
             Text(
-                "Turn this phone into an SMS gateway: it sends the messages you queue from the portal or API. Forwarding received SMS and reporting missed calls are optional and off by default.",
+                if (accountLoggedIn) {
+                    "Turn this phone into an SMS gateway: it sends the messages you queue from the portal or API. Forwarding received SMS and reporting missed calls are optional and off by default."
+                } else {
+                    "Turn this phone into an SMS gateway without signing in: paste a phone API key (vpk_…) generated from the portal or from a signed-in phone. Forwarding received SMS and reporting missed calls are optional and off by default."
+                },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -214,8 +239,16 @@ fun GatewaySettingsScreen(onBack: () -> Unit) {
             OutlinedTextField(
                 value = dedicatedKey,
                 onValueChange = { dedicatedKey = it },
-                label = { Text("Phone API key (optional)") },
-                supportingText = { Text("Leave empty to use your account key. Create scoped vpk_ keys under More → Phone API Keys.") },
+                label = { Text(if (accountLoggedIn) "Phone API key (optional)" else "Phone API key (required)") },
+                supportingText = {
+                    Text(
+                        if (accountLoggedIn) {
+                            "Leave empty to use your account key. Create scoped vpk_ keys under More → Phone API Keys."
+                        } else {
+                            "Create vpk_ keys from the web portal, or on a signed-in phone under More → Phone API Keys."
+                        }
+                    )
+                },
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth(),
