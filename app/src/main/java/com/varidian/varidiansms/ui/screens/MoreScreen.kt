@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.Card
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -51,6 +52,7 @@ fun MoreScreen(
     onOpenWebhooks: () -> Unit,
     onOpenPhoneKeys: () -> Unit,
     onOpenGateway: () -> Unit,
+    onOpenBilling: () -> Unit,
     onLoggedOut: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -102,6 +104,8 @@ fun MoreScreen(
         Card(Modifier.fillMaxWidth()) {
             Column {
                 MoreItem(Icons.Filled.Settings, "SMS Gateway Settings", "Run this phone as a gateway", onClick = onOpenGateway)
+                HorizontalDivider()
+                MoreItem(Icons.Filled.ShoppingCart, "Billing & Plan", "Plan, usage and wallet balance", onClick = onOpenBilling)
                 HorizontalDivider()
                 MoreItem(Icons.Filled.Share, "Webhooks", "Push events to your server", onClick = onOpenWebhooks)
                 HorizontalDivider()

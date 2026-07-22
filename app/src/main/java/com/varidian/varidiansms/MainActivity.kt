@@ -30,6 +30,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.varidian.varidiansms.ui.screens.BillingScreen
 import com.varidian.varidiansms.ui.screens.DashboardScreen
 import com.varidian.varidiansms.ui.screens.GatewaySettingsScreen
 import com.varidian.varidiansms.ui.screens.LoginScreen
@@ -65,6 +66,7 @@ object Routes {
     const val WEBHOOKS = "webhooks"
     const val PHONE_KEYS = "phone_keys"
     const val GATEWAY = "gateway"
+    const val BILLING = "billing"
 
     /** Gateway settings shown instead of login when no account is signed in. */
     const val GATEWAY_STANDALONE = "gateway_standalone"
@@ -114,6 +116,7 @@ fun AppRoot() {
                 onOpenWebhooks = { nav.navigate(Routes.WEBHOOKS) },
                 onOpenPhoneKeys = { nav.navigate(Routes.PHONE_KEYS) },
                 onOpenGateway = { nav.navigate(Routes.GATEWAY) },
+                onOpenBilling = { nav.navigate(Routes.BILLING) },
                 onLoggedOut = ::goToStandaloneGateway,
             )
         }
@@ -128,6 +131,9 @@ fun AppRoot() {
         }
         composable(Routes.GATEWAY) {
             GatewaySettingsScreen(onBack = { nav.popBackStack() })
+        }
+        composable(Routes.BILLING) {
+            BillingScreen(onBack = { nav.popBackStack() })
         }
     }
 }
@@ -151,6 +157,7 @@ fun MainShell(
     onOpenWebhooks: () -> Unit,
     onOpenPhoneKeys: () -> Unit,
     onOpenGateway: () -> Unit,
+    onOpenBilling: () -> Unit,
     onLoggedOut: () -> Unit,
 ) {
     val tabNav: NavHostController = rememberNavController()
@@ -199,6 +206,7 @@ fun MainShell(
                     onOpenWebhooks = onOpenWebhooks,
                     onOpenPhoneKeys = onOpenPhoneKeys,
                     onOpenGateway = onOpenGateway,
+                    onOpenBilling = onOpenBilling,
                     onLoggedOut = onLoggedOut,
                 )
             }

@@ -2,16 +2,22 @@ package com.varidian.varidiansms.api
 
 import android.content.Context
 import com.varidian.varidiansms.data.AuthSession
+import com.varidian.varidiansms.data.BillingData
 import com.varidian.varidiansms.data.DashboardData
 import com.varidian.varidiansms.data.DashboardStats
 import com.varidian.varidiansms.data.MessageItem
 import com.varidian.varidiansms.data.PhoneApiKeyItem
 import com.varidian.varidiansms.data.PhoneItem
+import com.varidian.varidiansms.data.SubscriptionInfo
+import com.varidian.varidiansms.data.UsageSummary
 import com.varidian.varidiansms.data.UserInfo
+import com.varidian.varidiansms.data.WalletInfo
 import com.varidian.varidiansms.data.WebhookItem
 import com.varidian.varidiansms.data.mapObjects
 import com.varidian.varidiansms.util.AppPrefs
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -186,6 +192,47 @@ class PortalApi(context: Context) {
 
     suspend fun deletePhoneApiKey(id: String): ApiResult<Unit> =
         request("DELETE", "/api/v1/phone-api-keys/$id").map { }
+
+    // --------------------------------------------------------------- billing
+
+    suspend fun subscription(): ApiResult<SubscriptionInfo> =
+        request("GET", "/api/v1/billing/subscription")
+            .map { SubscriptionInfo.fromJson(it.getJSONObject("data")) }
+
+    suspend fun usage(): ApiResult<UsageSummary> =
+        request("GET", "/api/v1/billing/usage")
+            .map { UsageSummary.fromJson(it.getJSONObject("data")) }
+
+    suspend fun wallet(): ApiResult<WalletInfo> =
+        request("GET", "/api/v1/billing/wallet")
+            .map { WalletInfo.fromJson(it.getJSONObject("data")) }
+
+    /**
+     * The billing screen's three endpoints in one call. Requests run
+     * concurrently; the first failure wins so the screen shows one error.
+     */
+    suspend fun billing(): ApiResult<BillingData> = coroutineScope {
+        val subscription = async { subscription() }
+        val usage = async { usage() }
+        val wallet = async { wallet() }
+
+        val subscriptionResult = subscription.await()
+        val usageResult = usage.await()
+        val walletResult = wallet.await()
+
+        when {
+            subscriptionResult is ApiResult.Error -> subscriptionResult
+            usageResult is ApiResult.Error -> usageResult
+            walletResult is ApiResult.Error -> walletResult
+            else -> ApiResult.Success(
+                BillingData(
+                    subscription = (subscriptionResult as ApiResult.Success).data,
+                    usage = (usageResult as ApiResult.Success).data,
+                    wallet = (walletResult as ApiResult.Success).data,
+                ),
+            )
+        }
+    }
 
     // ------------------------------------------------------------- internals
 

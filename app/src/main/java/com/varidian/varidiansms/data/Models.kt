@@ -164,10 +164,131 @@ data class DashboardData(
     val recentMessages: List<MessageItem>,
 )
 
+// ------------------------------------------------------------------ billing
+
+/**
+ * The account's current plan. Money is always integer ngwee on the wire
+ * (1 ZMW = 100 ngwee) — use [formatKwacha] to display it.
+ */
+data class SubscriptionInfo(
+    val planCode: String,
+    val planName: String,
+    val status: String,
+    val expiresAt: String?,
+    val price: Int,
+    val currency: String,
+    /** Set when a downgrade is queued to apply at [expiresAt]. */
+    val pendingPlan: String?,
+) {
+    val isActive: Boolean get() = status == "active"
+
+    companion object {
+        fun fromJson(json: JSONObject) = SubscriptionInfo(
+            planCode = json.optString("plan"),
+            planName = json.optString("plan_name").ifEmpty { json.optString("plan") },
+            status = json.optString("status"),
+            expiresAt = json.optStringOrNull("expires_at"),
+            price = json.optInt("price"),
+            currency = json.optString("currency").ifEmpty { "ZMW" },
+            pendingPlan = json.optStringOrNull("pending_plan"),
+        )
+    }
+}
+
+/** One metered resource. A null [limit] means the plan grants unlimited use. */
+data class UsageMetric(
+    val used: Int,
+    val limit: Int?,
+) {
+    val isUnlimited: Boolean get() = limit == null
+
+    /** 0f..1f for the progress bar; unlimited and zero-limit both read as empty. */
+    val fraction: Float
+        get() = if (limit == null || limit <= 0) 0f else (used.toFloat() / limit).coerceIn(0f, 1f)
+
+    companion object {
+        fun fromJson(json: JSONObject?) = UsageMetric(
+            used = json?.optInt("used") ?: 0,
+            limit = json?.optIntOrNull("limit"),
+        )
+    }
+}
+
+data class UsageSummary(
+    val period: String,
+    val messages: UsageMetric,
+    val phones: UsageMetric,
+    val webhooks: UsageMetric,
+    val resetsAt: String?,
+) {
+    companion object {
+        fun fromJson(json: JSONObject) = UsageSummary(
+            period = json.optString("period"),
+            messages = UsageMetric.fromJson(json.optJSONObject("messages")),
+            phones = UsageMetric.fromJson(json.optJSONObject("phones")),
+            webhooks = UsageMetric.fromJson(json.optJSONObject("webhooks")),
+            resetsAt = json.optStringOrNull("resets_at"),
+        )
+    }
+}
+
+/** A wallet ledger entry. [amount] is signed ngwee — credits positive. */
+data class WalletTransactionItem(
+    val id: Long,
+    val type: String,
+    val amount: Int,
+    val balanceAfter: Int,
+    val reference: String?,
+    val createdAt: String?,
+) {
+    companion object {
+        fun fromJson(json: JSONObject) = WalletTransactionItem(
+            id = json.optLong("id"),
+            type = json.optString("type"),
+            amount = json.optInt("amount"),
+            balanceAfter = json.optInt("balance_after"),
+            reference = json.optStringOrNull("reference"),
+            createdAt = json.optStringOrNull("created_at"),
+        )
+    }
+}
+
+data class WalletInfo(
+    val balance: Int,
+    val currency: String,
+    val transactions: List<WalletTransactionItem>,
+) {
+    companion object {
+        fun fromJson(json: JSONObject) = WalletInfo(
+            balance = json.optInt("balance"),
+            currency = json.optString("currency").ifEmpty { "ZMW" },
+            transactions = json.optJSONArray("transactions").mapObjects(WalletTransactionItem::fromJson),
+        )
+    }
+}
+
+/** Everything the billing screen shows, fetched in one pass. */
+data class BillingData(
+    val subscription: SubscriptionInfo,
+    val usage: UsageSummary,
+    val wallet: WalletInfo,
+)
+
 // ------------------------------------------------------------------ helpers
+
+/**
+ * Renders integer ngwee as "ZMW 150.00". The locale is pinned so amounts
+ * read identically to the web portal on every device.
+ */
+fun formatKwacha(ngwee: Int, currency: String = "ZMW"): String =
+    String.format(java.util.Locale.US, "%s %,.2f", currency, ngwee / 100.0)
 
 fun JSONObject.optStringOrNull(key: String): String? =
     if (isNull(key)) null else optString(key).takeIf { it.isNotEmpty() }
+
+/** Distinguishes an explicit JSON null (plan limit = "unlimited") from 0. */
+fun JSONObject.optIntOrNull(key: String): Int? =
+    if (!has(key) || isNull(key)) null else optInt(key)
 
 fun JSONArray?.toStringList(): List<String> {
     if (this == null) return emptyList()
